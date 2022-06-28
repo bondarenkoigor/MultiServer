@@ -17,20 +17,24 @@ namespace Client
             try
             {
                 socket.Connect(iPEnd);
-                Console.Write("Enter message for server:");
-                string msg = Console.ReadLine();
-
-                byte[] data = Encoding.Unicode.GetBytes(msg);
-                socket.Send(data);
-
-                byte[] buffer = new byte[256];
-                StringBuilder stringBuidler = new StringBuilder();
-                do
+                string msg = "";
+                while (true)
                 {
-                    socket.Receive(buffer);
-                    stringBuidler.Append(Encoding.Unicode.GetString(buffer));
-                } while (socket.Available > 0);
-                Console.WriteLine(stringBuidler);
+                    Console.Write("Enter message for server:");
+                    msg = Console.ReadLine();
+                    if (msg == "/end") break;
+                    byte[] data = Encoding.Unicode.GetBytes(msg);
+                    socket.Send(data);
+
+                    byte[] buffer = new byte[256];
+                    StringBuilder stringBuidler = new StringBuilder();
+                    do
+                    {
+                        socket.Receive(buffer);
+                        stringBuidler.Append(Encoding.Unicode.GetString(buffer));
+                    } while (socket.Available > 0);
+                    Console.WriteLine(stringBuidler);
+                }
             }
             catch (Exception ex)
             {
@@ -40,7 +44,6 @@ namespace Client
             {
                 socket.Shutdown(SocketShutdown.Both);
                 socket.Close();
-                Console.ReadLine();
             }
         }
     }
