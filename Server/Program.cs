@@ -2,46 +2,96 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.IO;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
-namespace networkprogrammingtest
+namespace Server
 {
     internal class Program
     {
         static void Main(string[] args)
         {
             const int PORT = 8008;
-            IPEndPoint iPEnd = new IPEndPoint(IPAddress.Parse("127.0.0.1"), PORT);
+
             Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            IPEndPoint iPEnd = new IPEndPoint(IPAddress.Parse("127.0.0.1"), PORT);
+            Socket clientSocket = null;
             try
             {
                 socket.Bind(iPEnd);
-                socket.Listen(10);
+                socket.Listen();
+                clientSocket = socket.Accept();
 
-                Socket clientSocket = socket.Accept();
-                StringBuilder stringBuilder = new StringBuilder();
-                while (stringBuilder.ToString() != "/end")
+                if (!Directory.Exists("Files")) Directory.CreateDirectory("Files");
+                while (true)
                 {
-                    int byteCount = 0;
-                    byte[] buffer = new byte[256];
-                    do
+                    string messageType = ReceiveString(clientSocket);
+                    if (messageType == "file")
                     {
-                        byteCount = clientSocket.Receive(buffer);
-                        stringBuilder.Append(Encoding.Unicode.GetString(buffer, 0, byteCount));
-                    } while (clientSocket.Available > 0);
+                        clientSocket.Send(Encoding.Unicode.GetBytes("message type confirmed"));
+                        string extenstion = ReceiveString(clientSocket);
+                        clientSocket.Send(Encoding.Unicode.GetBytes("extension confirmed"));
 
-                    Console.WriteLine($"Client msg:{stringBuilder}");
+                        File.WriteAllBytes($"Files\\{GenerateFileName(extenstion)}", ReceiveFile(clientSocket));
+                        Console.WriteLine("file created");
+                    }
+                    else if (messageType == "text")
+                    {
+                        clientSocket.Send(Encoding.Unicode.GetBytes("message type confirmed"));
 
-                    clientSocket.Send(Encoding.Unicode.GetBytes("Message recieved!"));
-                    stringBuilder.Clear();
+                        File.WriteAllText($"Files\\{GenerateFileName(".txt")}", ReceiveString(clientSocket));
+                        Console.WriteLine("text file created");
+                    }
                 }
-                Console.ReadKey();
-                clientSocket.Shutdown(SocketShutdown.Both);
-                clientSocket.Close();
-
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                Console.ReadLine();
+            }
             finally
             {
+                clientSocket.Shutdown(SocketShutdown.Both);
+            }
+        }
+        static string ReceiveString(Socket clientSocket)
+        {
+            byte[] buffer = new byte[256];
+            int byteCount = 0;
+            StringBuilder sb = new StringBuilder();
+            do
+            {
+                byteCount = clientSocket.Receive(buffer);
+                sb.Append(Encoding.Unicode.GetString(buffer, 0, byteCount));
+                if (byteCount == 0) continue;
+            } while (clientSocket.Available > 0);
+
+            return sb.ToString();
+        }
+        static byte[] ReceiveFile(Socket clientSocket)
+        {
+            byte[] buffer = new byte[256];
+            int byteCount = 0;
+            List<byte> bytes = new List<byte>();
+            StringBuilder sb = new StringBuilder();
+            do
+            {
+                byteCount = clientSocket.Receive(buffer);
+                bytes.AddRange(buffer);
+            } while (clientSocket.Available > 0);
+            return bytes.ToArray();
+        }
+        static string GenerateFileName(string extenstion)
+        {
+            string fileName = $"ReceivedText{extenstion}";
+            int counter = 0;
+            while (true)
+            {
+                if (!File.Exists($"Files\\{fileName}")) return fileName;
+                else fileName = $"ReceivedFile({counter}){extenstion}";
+                counter++;
             }
         }
     }
